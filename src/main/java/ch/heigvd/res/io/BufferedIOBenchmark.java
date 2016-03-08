@@ -3,8 +3,10 @@ package ch.heigvd.res.io;
 import ch.heigvd.res.io.util.Timer;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.BufferedWriter;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -36,6 +38,8 @@ public class BufferedIOBenchmark {
 		BlockByBlockWithBufferedStream
 	};
 
+        final static String FILE_NAME = "result-file.csv"; 
+        final static Character FILE_SEPARATOR = ',';        
 	final static String FILENAME_PREFIX = "test-data"; // we will write and read test files at this location
 	final static long NUMBER_OF_BYTES_TO_WRITE = 1024 * 1024 * 10; // we will write and read 10 MB files
 	
@@ -75,8 +79,47 @@ public class BufferedIOBenchmark {
 			}
 		}
 		LOG.log(Level.INFO, "  > Done in {0} ms.", Timer.takeTime());
+                putResult("Write", ioStrategy, numberOfBytesToWrite, blockSize, Timer.takeTime());
 	}
 	
+        
+        private void putResult(String operation,IOStrategy ioStrategy,long numberOfBytesToWrite, int blockSize, float time)
+        {
+            FileWriter fw = null;
+            BufferedWriter bw = null;
+            try
+            {   
+                fw = new FileWriter(FILE_NAME,true);
+                bw = new BufferedWriter(fw);
+                bw.write(operation + FILE_SEPARATOR);
+                bw.write(ioStrategy.toString() + FILE_SEPARATOR);
+                bw.write(Long.toString(numberOfBytesToWrite) + FILE_SEPARATOR);
+                bw.write(Integer.toString(blockSize)+ FILE_SEPARATOR);
+                bw.write(Float.toString(time) + FILE_SEPARATOR);
+                bw.newLine();  
+                bw.flush();     
+                        
+            }
+            catch (IOException ex)
+            {
+                LOG.log(Level.SEVERE, ex.getMessage(), ex);
+            }
+            finally
+            {
+                try 
+                {
+                    if (bw != null)
+                    {
+                        bw.close();
+                    }
+                }
+                catch (IOException ex)
+                {
+                    LOG.log(Level.SEVERE, ex.getMessage(), ex);
+                }
+            }
+            
+        }
 	/**
 	 * This method produces bytes on the passed stream (the method does not know this stream is buffered or not)
 	 * Depending on the strategy, the method either writes bytes one by one OR in chunks (the size of the chunk
@@ -120,6 +163,7 @@ public class BufferedIOBenchmark {
 	 * then delegates the actual consumption of bytes to another method, passing it the stream.
 	 */
 	private void consumeTestData(IOStrategy ioStrategy, int blockSize) {
+            long numberOfBytesToRead = 0;
 		LOG.log(Level.INFO, "Consuming test data ({0}, block size: {1}...", new Object[]{ioStrategy, blockSize});
 		Timer.start();
 
@@ -134,7 +178,7 @@ public class BufferedIOBenchmark {
 			}
 
 			// Now, let's call the method that does the actual work and produces bytes on the stream
-			consumeDataFromStream(is, ioStrategy, blockSize);
+			numberOfBytesToRead = consumeDataFromStream(is, ioStrategy, blockSize);
 
 			// We are done, so we only have to close the input stream
 			is.close();
@@ -150,6 +194,7 @@ public class BufferedIOBenchmark {
 			}
 		}
 		LOG.log(Level.INFO, "  > Done in {0} ms.", Timer.takeTime());
+                putResult("Read", ioStrategy, numberOfBytesToRead, blockSize, Timer.takeTime());
 
 	}
 
@@ -158,7 +203,7 @@ public class BufferedIOBenchmark {
 	 * Depending on the strategy, the method either reads bytes one by one OR in chunks (the size of the chunk
 	 * is passed in parameter). The method does not do anything with the read bytes, except counting them.
 	 */ 
-	private void consumeDataFromStream(InputStream is, IOStrategy ioStrategy, int blockSize) throws IOException {
+	private long consumeDataFromStream(InputStream is, IOStrategy ioStrategy, int blockSize) throws IOException {
 		int totalBytes = 0;
 		// If the strategy dictates to write byte by byte, then it's easy to write the loop; but let's just hope that our client has 
 		// given us a buffered output stream, otherwise the performance will be really bad
@@ -180,12 +225,45 @@ public class BufferedIOBenchmark {
 		}
 		
 		LOG.log(Level.INFO, "Number of bytes read: {0}", new Object[]{totalBytes});
+                return totalBytes;
 	}
 
 	/**
 	 * @param args the command line arguments
 	 */
 	public static void main(String[] args) {
+                FileWriter fw = null;
+                BufferedWriter bw = null;
+                try
+                {                
+                    fw = new FileWriter(FILE_NAME);
+                    bw = new BufferedWriter(fw);
+                    bw.write("operation" + FILE_SEPARATOR);
+                    bw.write("strategy" + FILE_SEPARATOR);
+                    bw.write("blockSize" + FILE_SEPARATOR);
+                    bw.write("fileSizeInBytes" + FILE_SEPARATOR);
+                    bw.write("durationInMs" + FILE_SEPARATOR);
+                    bw.newLine();     
+                    bw.flush();    
+                }
+                catch (IOException ex)
+                {
+                    LOG.log(Level.SEVERE, ex.getMessage(), ex);
+                }
+                finally
+                {
+                    try 
+                    {
+                        if (bw != null)
+                        {
+                            bw.close();
+                        }
+                    }
+                    catch (IOException ex)
+                    {
+                        LOG.log(Level.SEVERE, ex.getMessage(), ex);
+                    }
+                }
 		System.setProperty("java.util.logging.SimpleFormatter.format", "%5$s %n");
 
 		BufferedIOBenchmark bm = new BufferedIOBenchmark();
